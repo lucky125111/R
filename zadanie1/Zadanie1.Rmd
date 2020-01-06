@@ -1,0 +1,158 @@
+---
+title: "Zadanie1"
+author: "Łukasz Berwid"
+date: "1/6/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r libs, include=FALSE}
+library("plyr")
+library("dplyr")
+library("ggplot2")
+library("knitr")
+library("plyr")
+library("kableExtra")
+#to render hraphs on Mac OS you need to install from github since my mac doesnt support x11
+#devtools::intall_github("dcomtois/summarytools", ref = "no-x11-check")
+library("summarytools")
+```
+
+```{r, include=FALSE}
+st_css()   
+knitr::opts_chunk$set(echo = TRUE)
+opts_chunk$set(results = 'asis',     
+                comment = NA, 
+                prompt = FALSE, 
+                cache = FALSE)
+
+st_options(plain.ascii = FALSE,      
+            style = "rmarkdown" ,       
+            footnote = NA,            
+            subtitle.emphasis = FALSE) 
+```
+## R Markdown
+
+This data set contains weighted census data extracted from the 1994 and 1995 current population surveys conducted by the U.S. Census Bureau. The data contains demographic and employment related variables. [here](http://mlr.cs.umass.edu/ml/machine-learning-databases/census-income-mld/census-income.data.html).
+
+Data URL [here](http://mlr.cs.umass.edu/ml/machine-learning-databases/census-income/census-income.data).
+
+## 1. Download and load data
+
+### Download data
+```{r donwload}
+ URL <- 'http://mlr.cs.umass.edu/ml/machine-learning-databases/census-income/census-income.data'
+ CSVFilePath <- 'Zadanie1.csv'
+ download.file(url=URL, destfile=CSVFilePath, method="libcurl")
+```
+
+### Load data
+``` {r data_load, error=TRUE}
+CSVFilePath <- 'Zadanie1.csv'
+censusIncomeDataFrame <- read.csv(file=CSVFilePath, strip.white=TRUE)
+colnames(censusIncomeDataFrame) <- c("age", "workclass", "fnlwgt", "education", "education-num", "marital-status", "occupation", "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country", "class")
+
+kable(summary(censusIncomeDataFrame))
+```
+
+## 2.
+Columns that contains missing values
+``` {r}
+cols_with_missing_names <- colnames(censusIncomeDataFrame)[apply(censusIncomeDataFrame, MARGIN = 2, function(a) any(a=='?'))]
+NameList <- cols_with_missing_names
+idx <- match(NameList, names(censusIncomeDataFrame))
+kable(colSums(censusIncomeDataFrame[,c(idx)]  == '?'), row.names = NA, col.names = 'missing count')
+```
+
+Total Number of missing values
+``` {r}
+kable(length(censusIncomeDataFrame[censusIncomeDataFrame=='?']), col.names = 'missing count')
+```
+
+## 3. Gender and age distribution
+
+### Gender distribution chart
+``` {r}
+slices <- aggregate(censusIncomeDataFrame$sex,by=list(censusIncomeDataFrame$sex),FUN=length)
+lbls <- c('Female', 'Male')
+pct <- round(slices$x/sum(slices$x)*100)
+lbls <- paste(lbls, pct) # add percents to labels
+lbls <- paste(lbls,"%",sep="") # ad % to labels
+pie(slices$x, labels = lbls, main="Pie Chart of Countries")
+```
+
+### Age distribution historgram
+``` {r}
+hist(censusIncomeDataFrame$age, 
+     main="Histogram for Age", 
+     xlab="Age", 
+     ylab="Count",
+     xlim=c(0,100),
+     breaks=10)
+```
+
+## 4. Table showing percetage count of native americans
+
+``` {r}
+natives_count <- length(which(censusIncomeDataFrame$`native-country` == "United-States")) + length(which(censusIncomeDataFrame$`native-country` == "OutlyingUS(Guam-USVI-etc)"))
+natives_percentage <- (natives_count / count(censusIncomeDataFrame)) * 100
+
+natives_percentage <- data.frame(total_count=count(censusIncomeDataFrame), natives_count=natives_count, natives_percentage=round(natives_percentage,2))
+
+colnames(natives_percentage) <- rbind("total_count", "natives_count", "natives_percentage")
+kable(natives_percentage)
+```
+
+## 5. Number of workhours per week by workclass
+
+``` {r}
+slices <- aggregate(censusIncomeDataFrame$`hours-per-week`,by=list(censusIncomeDataFrame$workclass),FUN=mean)
+colnames(slices)<-rbind("workclass", "hours-per-week")
+
+ggplot(slices, aes(x=slices$workclass, y=slices$`hours-per-week`)) + 
+  geom_bar(stat = "identity") +
+  xlab("Work class") +
+  ylab("Mean number of hours per week") 
+```
+
+
+## 6. Distribution of average number of hours worked in private sector, for the group of people under age 30
+
+``` {r}
+under30_private <-subset(censusIncomeDataFrame, age < 30 & workclass == 'Private')
+
+under30_private_summary <- under30_private %>% 
+    group_by(`education`) %>% 
+    summarise(count=n(), min = min(`hours-per-week`), max = max(`hours-per-week`), median = median(`hours-per-week`))
+
+kable(under30_private_summary)
+
+ggplot(under30_private_summary, aes(x = education, y = median, ymin = min, ymax = max)) + 
+    geom_linerange() + 
+    geom_pointrange()
+```
+
+
+## 7. Interesting plot
+
+Relationship distribution by age group
+
+``` {r}
+censusIncomeDataFrame$age_group <- paste((round(censusIncomeDataFrame$age, -1)),  "-",  (round(censusIncomeDataFrame$age, -1) + 10))
+
+suppressWarnings(ggplot(censusIncomeDataFrame, aes(relationship)) +
+  ggtitle("Relationship status distribution per age group") +
+  theme(plot.title = element_text(hjust = 0.5, face="bold")) +
+  geom_histogram(stat="count") +
+  xlab("relationship status") +
+  ylab("Count") +
+  facet_wrap("age_group"))
+```
+
+Data Summary
+
+``` {r}
+suppressWarnings(dfSummary(censusIncomeDataFrame, plain.ascii = FALSE, style = "grid", graph.magnif = 0.75, valid.col = FALSE))
+```
