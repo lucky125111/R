@@ -1,5 +1,5 @@
 ---
-title: "Zadanie1"
+title: "Income analysis"
 author: "Łukasz Berwid"
 date: "1/6/2020"
 output:
