@@ -1,0 +1,93 @@
+---
+title: "Processor analysis"
+author: "Łukasz Berwid"
+date: "2/2/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r libs, include=FALSE}
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+```
+
+## 1. Download and load data
+
+```{r download}
+machine_data <- read.csv("http://mlr.cs.umass.edu/ml/machine-learning-databases/cpu-performance/machine.data", header=FALSE, colClasses = c("factor", "character", "integer", "integer", "integer", "integer", "integer", "integer", "integer"), col.names = c('vendor name' ,'Model Name','MYCT','MMIN','MMAX','CACH','CHMIN','CHMAX','PRP','ERP'))
+kable(head(machine_data))
+```
+
+## 2. Missing values
+```{r}
+cols_with_missing_names <- colnames(machine_data)[apply(machine_data, MARGIN = 2, function(a) any(is.na(a)))]
+NameList <- cols_with_missing_names
+idx <- match(NameList, names(machine_data))
+kable(colSums(is.na(machine_data[,c(idx)])), row.names = NA, col.names = 'missing count')
+```
+
+## 3. Vendors histogram
+```{r}
+ggplot(data.frame(machine_data$vendor.name), aes(x=machine_data$vendor.name)) +
+  geom_bar() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+## 4. MYCT chart
+```{r}
+ggplot(data.frame(machine_data$MYCT), aes(x=machine_data$MYCT)) +
+  geom_histogram(binwidth = 50)
+```
+
+## 5. MMIN MMAX histogram
+```{r}
+chart_data_max <- aggregate(machine_data$MMAX, list(machine_data$vendor.name), mean)
+colnames(chart_data_max) <- c('vendor', 'value')
+chart_data_max$type <- 'mmax'
+
+chart_data_min <- aggregate(machine_data$MMIN, list(machine_data$vendor.name), mean)
+colnames(chart_data_min) <- c('vendor', 'value')
+chart_data_min$type <- 'mmin'
+
+chart_data <- rbind(chart_data_max, chart_data_min)
+
+ggplot(chart_data, aes(fill=type, y=value, x=vendor)) +  geom_bar(position="dodge", stat="identity") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+```
+
+## 6. Table CHMAX gt 12 distibution
+```{r}
+chmax_above_12 <- machine_data[which(machine_data$CHMAX>12),]
+total <- NROW(chmax_above_12)
+frquencies <- aggregate(chmax_above_12$vendor.name, list(chmax_above_12$vendor.name), FUN = NROW)
+colnames(frquencies) <- c('vendor', 'count')
+frquencies$frequency <- frquencies$count * 100 / total
+kable(frquencies)
+```
+
+## 7. Companies with CHMIN lt 16
+```{r}
+
+chim <- machine_data[which(machine_data$CHMIN<16),]
+length(chim)
+kable(data.frame(with(chim, table(vendor.name))))
+
+```
+
+## 8. ERP distribution for top 4 vendors (by model count)
+```{r}
+top_4 <- data.frame(sort(table(machine_data$vendor.name),decreasing=TRUE)[1:4])
+kable(top_4)
+companies <- top_4$Var1
+subset <- subset(machine_data, machine_data$vendor.name %in% companies)
+total <- NROW(subset)
+subset <- aggregate(subset$vendor.name, list(subset$vendor.name, subset$ERP), FUN = NROW)
+colnames(subset) <- c('vendor', 'ERP', 'Count')
+subset$frequency <- subset$Count * 100 / total
+kable(subset)
+
+```
+
+
